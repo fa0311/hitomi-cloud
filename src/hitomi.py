@@ -3,11 +3,12 @@ import json
 import re
 import struct
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Optional
 from urllib.parse import quote
 
 import httpx
 from aiofiles import open, os
+from retry import retry
 from tqdm import tqdm
 
 
@@ -113,8 +114,14 @@ class HitomiDownloader:
         self.semaphore = semaphore
 
     @classmethod
-    async def factrory(cls, client: httpx.AsyncClient, semaphore: int = 10):
-        return cls(client, await cls.ua(client), asyncio.Semaphore(semaphore))
+    async def factrory(
+        cls,
+        client: httpx.AsyncClient,
+        semaphore: int = 10,
+        ua: Optional[str] = None,
+    ):
+        new_ua = ua or await cls.ua(client)
+        return cls(client, new_ua, asyncio.Semaphore(semaphore))
 
     @staticmethod
     async def ua(client: httpx.AsyncClient) -> str:
@@ -122,8 +129,17 @@ class HitomiDownloader:
         response = await client.get(url)
         return response.json()["chrome"]
 
-    def sanitize_filename(self, filename: str) -> str:
-        return re.sub(r'[<>:"/\\|?*]', "", filename)
+    @staticmethod
+    async def input(path: str):
+        async with open(path, encoding="utf-8") as f:
+            data = await f.read()
+
+        artist = re.findall(r"https://hitomi.la/artist/(.+).html", data)
+        return artist
+
+    @staticmethod
+    def sanitize_filename(filename: str) -> str:
+        return re.sub(r"[\\/:*?\"<>|]", "", filename).rstrip(" .")
 
     async def get(self, input: str):
         return await self.hitomi.get(input)
@@ -144,18 +160,21 @@ class HitomiDownloader:
     def get_referer(self, data: DataType) -> str:
         return f"https://hitomi.la/{quote(data['galleryurl'])}"
 
+    @retry(tries=30, delay=1)
     async def download(self, id: str, output: str):
         async with self.semaphore:
             data, urls = await self.hitomi.galleryblock(id)
 
             title = self.get_title(data)
-            await os.makedirs(f"output/{output}/{title}_{id}", exist_ok=True)
+            await os.makedirs(f"{output}/{title}_{id}", exist_ok=True)
             for i, url in enumerate(tqdm(urls, desc=title, leave=False)):
-                response = await self.hitomi.request(
-                    url, {"Referer": self.get_referer(data)}
-                )
-                async with open(f"output/{output}/{title}_{id}/{i:04}.webp", "wb") as f:
-                    await f.write(response.content)
+                await self.save(url, f"{output}/{title}_{id}/{i:04}.webp", data)
+
+    @retry(tries=30, delay=1)
+    async def save(self, url: str, output: str, data: dict):
+        response = await self.hitomi.request(url, {"Referer": self.get_referer(data)})
+        async with open(f"{output}", "wb") as f:
+            await f.write(response.content)
 
     async def download_all(self, input: str, output: str):
         ids = await self.get(input)

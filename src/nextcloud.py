@@ -53,6 +53,7 @@ class NextCloud:
             content=ET.tostring(root),
             auth=(self.username, self.password),
         )
+        assert response.status_code == 207
         root = ET.fromstring(response.content)
         tuples = []
         for response in root.findall(".//d:response", tag_namespace):
@@ -113,6 +114,7 @@ class NextCloud:
             headers={"Content-Type": "image/webp"},
             auth=(self.username, self.password),
         )
+        assert response.status_code == 201
         file_id = response.headers["oc-fileid"]
         return file_id
 
@@ -152,6 +154,7 @@ class NextCloud:
             self.url + f"/remote.php/dav/systemtags-relations/files/{file_id}/{tag_id}",
             auth=(self.username, self.password),
         )
+        assert response.status_code == 201
         return response.text
 
     async def unassign_tag(self, file_id, tag_id):
@@ -160,4 +163,5 @@ class NextCloud:
             self.url + f"/remote.php/dav/systemtags-relations/files/{file_id}/{tag_id}",
             auth=(self.username, self.password),
         )
+        assert response.status_code == 204
         return response.text
