@@ -8,7 +8,7 @@ from urllib.parse import quote
 
 import httpx
 from aiofiles import open, os
-from retry import retry
+from tenacity import retry, stop_after_attempt, wait_fixed
 from tqdm import tqdm
 
 
@@ -149,10 +149,10 @@ class HitomiDownloader:
         return self.sanitize_filename(title)
 
     def get_tags(self, data: DataType) -> list[str]:
-        return [tag["tag"] for tag in data.get("tags", [])]
+        return [tag["tag"] for tag in (data.get("tags") or [])]
 
     def get_series(self, data: DataType) -> list[str]:
-        return [series["parody"] for series in data.get("parodys", [])]
+        return [series["parody"] for series in (data.get("series") or [])]
 
     def get_characters(self, data: DataType) -> list[str]:
         return [character["character"] for character in (data.get("characters") or [])]
@@ -160,7 +160,7 @@ class HitomiDownloader:
     def get_referer(self, data: DataType) -> str:
         return f"https://hitomi.la/{quote(data['galleryurl'])}"
 
-    @retry(tries=30, delay=1)
+    @retry(stop=stop_after_attempt(30), wait=wait_fixed(1))
     async def download(self, id: str, output: str):
         async with self.semaphore:
             data, urls = await self.hitomi.galleryblock(id)
@@ -168,13 +168,18 @@ class HitomiDownloader:
             title = self.get_title(data)
             await os.makedirs(f"{output}/{title}_{id}", exist_ok=True)
             for i, url in enumerate(tqdm(urls, desc=title, leave=False)):
-                await self.save(url, f"{output}/{title}_{id}/{i:04}.webp", data)
+                res = await self.save(url, data)
+                await self.save_image(f"{output}/{title}_{id}/{i:04}.webp", res)
 
-    @retry(tries=30, delay=1)
-    async def save(self, url: str, output: str, data: dict):
-        response = await self.hitomi.request(url, {"Referer": self.get_referer(data)})
+    @retry(stop=stop_after_attempt(30), wait=wait_fixed(1))
+    async def save(self, url: str, data: DataType):
+        res = await self.hitomi.request(url, {"Referer": self.get_referer(data)})
+        return res.content
+
+    @retry(stop=stop_after_attempt(30), wait=wait_fixed(1))
+    async def save_image(self, output: str, content: bytes):
         async with open(f"{output}", "wb") as f:
-            await f.write(response.content)
+            await f.write(content)
 
     async def download_all(self, input: str, output: str):
         ids = await self.get(input)
