@@ -1,9 +1,7 @@
 import asyncio
-import io
 from typing import Optional
 
 import httpx
-from PIL import Image
 from tenacity import retry, stop_after_attempt, wait_fixed
 from tqdm import tqdm
 
@@ -73,10 +71,7 @@ class HitomiDownloaderUpload(HitomiDownloader):
 
     @retry(stop=stop_after_attempt(30), wait=wait_fixed(1))
     async def save_image(self, output: str, content: bytes):
-        png = io.BytesIO()
-        image = Image.open(io.BytesIO(content))
-        image.save(png, "PNG")
-        await self.nextcloud.upload(output, png.getvalue())
+        await self.nextcloud.upload(output, content)
 
     @retry(stop=stop_after_attempt(30), wait=wait_fixed(1))
     async def set_tags(self, file_id: str, tags: list[str]):

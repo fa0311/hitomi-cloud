@@ -136,7 +136,7 @@ class NextCloud:
         user_assignable=True,
         can_assign=True,
     ):
-        await self.client.request(
+        response = await self.client.request(
             "POST",
             self.url + "/remote.php/dav/systemtags/",
             json={
@@ -147,6 +147,8 @@ class NextCloud:
             },
             auth=(self.username, self.password),
         )
+        assert response.status_code == 201 or response.status_code == 409
+        return response.text
 
     async def assign_tag(self, file_id, tag_id):
         response = await self.client.request(
@@ -154,7 +156,7 @@ class NextCloud:
             self.url + f"/remote.php/dav/systemtags-relations/files/{file_id}/{tag_id}",
             auth=(self.username, self.password),
         )
-        assert response.status_code == 201
+        assert response.status_code == 201 or response.status_code == 409
         return response.text
 
     async def unassign_tag(self, file_id, tag_id):
