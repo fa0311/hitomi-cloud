@@ -139,7 +139,7 @@ class HitomiDownloader:
 
     @staticmethod
     def sanitize_filename(filename: str) -> str:
-        return re.sub(r"[\\/:*?\"<>|]", "", filename).rstrip(" .")
+        return re.sub(r"[\\/:*?\"<>|#]", "", filename).rstrip(" .")
 
     async def get(self, input: str):
         return await self.hitomi.get(input)
