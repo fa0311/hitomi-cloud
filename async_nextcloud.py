@@ -56,7 +56,7 @@ async def get_galleryblock(
     semaphore: asyncio.Semaphore = asyncio.Semaphore(10),
 ):
     async with semaphore:
-        return id, *(await downloader.galleryblock(id))
+        return await downloader.galleryblock(id)
 
 
 async def main():
@@ -79,7 +79,7 @@ async def main():
 
         future = [get_galleryblock(downloader, id) for id in ids]
         data_list = await asyncio.gather(*future)
-        for id, data, urls in data_list:
+        for id, (data, urls) in zip(ids, data_list):
             title = downloader.get_title(data)
             output = f"{artist_filename}/{title}_{id}"
             await nextcloud.mkdir(artist_filename)

@@ -24,6 +24,21 @@ class HitomiDetail:
 DataType = dict[str, Any]
 
 
+def cache_manager(func):
+    cache: list[tuple[Any, Any]] = []
+
+    async def wrapper(self, *args, **kwargs):
+        for arg, value in cache:
+            if arg == args:
+                return value
+
+        res = await func(self, *args, **kwargs)
+        cache.append((args, res))
+        return res
+
+    return wrapper
+
+
 class Hitomi:
     def __init__(self, client: httpx.AsyncClient, headers: dict):
         self.client = client
