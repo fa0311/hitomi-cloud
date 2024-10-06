@@ -1,4 +1,3 @@
-import asyncio
 import json
 import re
 import struct
@@ -7,9 +6,8 @@ from typing import Any, Optional
 from urllib.parse import quote
 
 import httpx
-from aiofiles import open, os
+from aiofiles import open
 from tenacity import retry, stop_after_attempt, wait_fixed
-from tqdm import tqdm
 
 
 @dataclass
@@ -36,12 +34,13 @@ class Hitomi:
         assert response.status_code >= 200 and response.status_code < 300
         return response
 
-    async def get(self, input: str) -> list[str]:
+    async def get_data(self, input: str) -> list[str]:
         url = input.replace("hitomi.la", "ltn.hitomi.la", 1).replace(
             ".html", ".nozomi", 1
         )
+        inf = 2**31 - 1
         response = await self.request(
-            url, {"Referer": "https://hitomi.la/", "Range": "bytes=0-1000"}
+            url, {"Referer": "https://hitomi.la/", "Range": f"bytes=0-{inf}"}
         )
         total = len(response.content) // 4
         res = [
@@ -108,20 +107,17 @@ class HitomiDownloader:
         self,
         client: httpx.AsyncClient,
         userAgent: str,
-        semaphore: asyncio.Semaphore,
     ):
         self.hitomi = Hitomi(client, {"User-Agent": userAgent})
-        self.semaphore = semaphore
 
     @classmethod
     async def factrory(
         cls,
         client: httpx.AsyncClient,
-        semaphore: int = 10,
         ua: Optional[str] = None,
     ):
         new_ua = ua or await cls.ua(client)
-        return cls(client, new_ua, asyncio.Semaphore(semaphore))
+        return cls(client, new_ua)
 
     @staticmethod
     async def ua(client: httpx.AsyncClient) -> str:
@@ -130,7 +126,7 @@ class HitomiDownloader:
         return response.json()["chrome"]
 
     @staticmethod
-    async def input(path: str):
+    async def input(path: str) -> list[str]:
         async with open(path, encoding="utf-8") as f:
             data = await f.read()
 
@@ -140,9 +136,6 @@ class HitomiDownloader:
     @staticmethod
     def sanitize_filename(filename: str) -> str:
         return re.sub(r"[\\/:*?\"<>|#]", "", filename).rstrip(" .")
-
-    async def get(self, input: str):
-        return await self.hitomi.get(input)
 
     def get_title(self, data: DataType) -> str:
         title = data.get("japanese_title") or data["title"]
@@ -160,39 +153,13 @@ class HitomiDownloader:
     def get_referer(self, data: DataType) -> str:
         return f"https://hitomi.la/{quote(data['galleryurl'])}"
 
-    @retry(stop=stop_after_attempt(30), wait=wait_fixed(1))
-    async def download(self, id: str, output: str):
-        async with self.semaphore:
-            data, urls = await self.hitomi.galleryblock(id)
+    async def get_data(self, input: str):
+        return await self.hitomi.get_data(input)
 
-            title = self.get_title(data)
-            await os.makedirs(f"{output}/{title}_{id}", exist_ok=True)
-            for i, url in enumerate(tqdm(urls, desc=title, leave=False)):
-                res = await self.save(url, data)
-                await self.save_image(f"{output}/{title}_{id}/{i:04}.webp", res)
+    async def galleryblock(self, id: str):
+        return await self.hitomi.galleryblock(id)
 
-    @retry(stop=stop_after_attempt(30), wait=wait_fixed(1))
+    @retry(stop=stop_after_attempt(30), wait=wait_fixed(3))
     async def save(self, url: str, data: DataType):
         res = await self.hitomi.request(url, {"Referer": self.get_referer(data)})
         return res.content
-
-    @retry(stop=stop_after_attempt(30), wait=wait_fixed(1))
-    async def save_image(self, output: str, content: bytes):
-        async with open(f"{output}", "wb") as f:
-            await f.write(content)
-
-    async def download_all(self, input: str, output: str):
-        ids = await self.get(input)
-        for id in ids:
-            await self.download(id, output)
-
-    async def download_all_async(self, input: str, output: str):
-        ids = await self.get(input)
-        tasks = []
-        for id in ids:
-            tasks.append(self.download(id, output))
-
-        pbar = tqdm(total=len(tasks), leave=False, desc="Downloading")
-        for f in asyncio.as_completed(tasks):
-            await f
-            pbar.update()

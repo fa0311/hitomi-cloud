@@ -114,7 +114,7 @@ class NextCloud:
             headers={"Content-Type": "image/webp"},
             auth=(self.username, self.password),
         )
-        assert response.status_code == 201
+        assert response.status_code == 201 or response.status_code == 409
         file_id = response.headers["oc-fileid"]
         return file_id
 
