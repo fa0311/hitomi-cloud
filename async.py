@@ -45,7 +45,7 @@ async def get_galleryblock(
 
 
 async def main():
-    client = httpx.AsyncClient()
+    client = httpx.AsyncClient(timeout=None)
     downloader = await HitomiDownloader.factrory(client)
     artist = await downloader.input("input.txt")
 

@@ -8,7 +8,7 @@ from src.hitomi import HitomiDownloader
 
 
 async def main():
-    client = httpx.AsyncClient()
+    client = httpx.AsyncClient(timeout=None)
     downloader = await HitomiDownloader.factrory(client)
     artist = await downloader.input("input.txt")
     for file in tqdm(artist, leave=False):

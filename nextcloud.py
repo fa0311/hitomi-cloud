@@ -14,7 +14,7 @@ def print(*args, **kwargs):
 
 
 async def main():
-    client = httpx.AsyncClient()
+    client = httpx.AsyncClient(timeout=None)
     downloader = await HitomiDownloader.factrory(client)
     env = Settings()
     nextcloud = NextCloud(client, env.username, env.password, env.url)
