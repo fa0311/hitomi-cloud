@@ -22,6 +22,7 @@ async def download_all_async(
     field_id: str,
     data: dict,
     urls: list[str],
+    end_tag: str,
     semaphore1: asyncio.Semaphore = asyncio.Semaphore(10),
     semaphore2: asyncio.Semaphore = asyncio.Semaphore(3),
 ) -> None:
@@ -39,6 +40,7 @@ async def download_all_async(
         for tag_name in tags:
             tag_id = await tag.get_tag_id(tag_name)
             await nextcloud.assign_tag(field_id, tag_id)
+        await nextcloud.assign_tag(field_id, end_tag)
 
 
 async def get_data(
@@ -70,6 +72,7 @@ async def main():
 
     artist_url = [f"https://hitomi.la/artist/{file}.html" for file in artist]
     ids_list = await asyncio.gather(*[get_data(downloader, url) for url in artist_url])
+    invisible_tag_id = await tag.get_tag_id(env.invisible_tags)
 
     manga = []
 
@@ -77,18 +80,24 @@ async def main():
         artist, lang = file.rsplit("-", 1) if "-" in file else (file, "all")
         artist_filename = downloader.sanitize_filename(artist)
 
+        await nextcloud.mkdir(artist_filename)
+        images = await nextcloud.path_list(artist_filename)
+        for timestamp, content_type, id, image, displayname, tags in images[1:]:
+            if env.invisible_tags not in tags:
+                print(f"Delete {displayname}")
+                await nextcloud.delete(f"{artist_filename}/{displayname}")
+
         future = [get_galleryblock(downloader, id) for id in ids]
         data_list = await asyncio.gather(*future)
         for id, (data, urls) in zip(ids, data_list):
             title = downloader.get_title(data)
-            output = f"{artist_filename}/{title}_{id}"
-            await nextcloud.mkdir(artist_filename)
+            output = f"{artist_filename}/{int(id):09}_{title}"
             field_id = await nextcloud.mkdir(output)
             if field_id is None:
                 print(f"Skip {output}")
             else:
                 print(f"Download {output}")
-                manga.append((output, title, field_id, data, urls))
+                manga.append((output, title, field_id, data, urls, invisible_tag_id))
 
     tasks = [download_all_async(downloader, tag, nextcloud, *args) for args in manga]
 

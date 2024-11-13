@@ -15,3 +15,4 @@ class Settings(BaseSettings):
     username: str = Field()
     password: str = Field()
     path: str = Field()
+    invisible_tags: str = Field()

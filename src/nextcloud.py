@@ -118,6 +118,15 @@ class NextCloud:
         file_id = response.headers["oc-fileid"]
         return file_id
 
+    async def delete(self, path: str):
+        response = await self.client.request(
+            "DELETE",
+            f"{self.url}/remote.php/dav/files/{self.username}/{self.current}{path}",
+            auth=(self.username, self.password),
+        )
+        assert response.status_code == 204
+        return response.text
+
     async def get_tags(self):
         res = await self.request(
             "PROPFIND",

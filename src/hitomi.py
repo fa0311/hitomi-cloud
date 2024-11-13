@@ -174,7 +174,7 @@ class HitomiDownloader:
     async def galleryblock(self, id: str):
         return await self.hitomi.galleryblock(id)
 
-    @retry(stop=stop_after_attempt(30), wait=wait_fixed(3))
+    @retry(stop=stop_after_attempt(9999999), wait=wait_fixed(3))
     async def save(self, url: str, data: DataType):
         res = await self.hitomi.request(url, {"Referer": self.get_referer(data)})
         return res.content
