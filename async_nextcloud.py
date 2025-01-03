@@ -32,15 +32,13 @@ async def download_all_async(
     data: dict,
     urls: list[str],
     end_tag: str,
-    semaphore1: asyncio.Semaphore = asyncio.Semaphore(10),
-    semaphore2: asyncio.Semaphore = asyncio.Semaphore(3),
+    semaphore: asyncio.Semaphore = asyncio.Semaphore(10),
 ) -> None:
-    async with semaphore1:
+    async with semaphore:
         field_id = await nextcloud.mkdir(output2)
         assert field_id is not None
         for i, url in enumerate(tqdm(urls, leave=False, desc=desc)):
-            async with semaphore2:
-                bin = await downloader.save(url, data)
+            bin = await downloader.save(url, data)
             await nextcloud.upload(f"{output2}/{i:04}.webp", bin)
         tags = [
             *downloader.get_tags(data),
@@ -59,7 +57,7 @@ async def download_all_async(
 async def get_data(
     downloader: HitomiDownloader,
     url: str,
-    semaphore: asyncio.Semaphore = asyncio.Semaphore(10),
+    semaphore: asyncio.Semaphore = asyncio.Semaphore(30),
 ):
     async with semaphore:
         return await downloader.get_data(url)
@@ -68,7 +66,7 @@ async def get_data(
 async def get_galleryblock(
     downloader: HitomiDownloader,
     id: str,
-    semaphore: asyncio.Semaphore = asyncio.Semaphore(10),
+    semaphore: asyncio.Semaphore = asyncio.Semaphore(30),
 ):
     async with semaphore:
         return await downloader.galleryblock(id)
