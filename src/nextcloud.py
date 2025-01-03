@@ -1,3 +1,4 @@
+import urllib.parse
 import xml.etree.ElementTree as ET
 from typing import Optional
 
@@ -125,6 +126,20 @@ class NextCloud:
             auth=(self.username, self.password),
         )
         assert response.status_code == 204
+        return response.text
+
+    async def move(self, path: str, new_path: str):
+        suffix = urllib.parse.quote(f"{self.current}{new_path}", safe="/")
+        response = await self.client.request(
+            "MOVE",
+            f"{self.url}/remote.php/dav/files/{self.username}/{self.current}{path}",
+            headers={
+                "Destination": f"{self.url}/remote.php/dav/files/{self.username}/{suffix}",
+            },
+            auth=(self.username, self.password),
+        )
+
+        assert response.status_code == 201
         return response.text
 
     async def get_tags(self):

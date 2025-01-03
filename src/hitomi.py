@@ -7,7 +7,7 @@ from urllib.parse import quote
 
 import httpx
 from aiofiles import open
-from tenacity import retry, stop_after_attempt, wait_fixed
+from tenacity import retry, stop_after_attempt, wait_random
 
 
 @dataclass
@@ -174,7 +174,7 @@ class HitomiDownloader:
     async def galleryblock(self, id: str):
         return await self.hitomi.galleryblock(id)
 
-    @retry(stop=stop_after_attempt(9999999), wait=wait_fixed(3))
+    @retry(stop=stop_after_attempt(10), wait=wait_random(0, 10))
     async def save(self, url: str, data: DataType):
         res = await self.hitomi.request(url, {"Referer": self.get_referer(data)})
         return res.content
