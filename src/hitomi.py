@@ -62,9 +62,7 @@ class Hitomi:
             ".html", ".nozomi", 1
         )
         inf = 2**31 - 1
-        response = await self.request(
-            url, {"Referer": "https://hitomi.la/", "Range": f"bytes=0-{inf}"}
-        )
+        response = await self.request(url, {"Referer": "https://hitomi.la/", "Range": f"bytes=0-{inf}"})
         total = len(response.content) // 4
         res = [
             str(struct.unpack(">i", response.content[i * 4 : (i + 1) * 4])[0])
@@ -84,8 +82,7 @@ class Hitomi:
         m = re.search(r"(..)(.)$", h)
         return str(int(m.group(2) + m.group(1), 16))  # type: ignore
 
-    def subdomain_from_url(self, hash: str, ggm: list[str], ggb: str, ggo: str, ggo2: str,
-                           ) -> str:
+    def subdomain_from_url(self, hash: str, ggm: list[str], ggb: str, ggo: str, ggo2: str, ext: str) -> str:
         b = 16
 
         r = re.compile(r"[0-9a-f]{61}([0-9a-f]{2})([0-9a-f])")
@@ -94,15 +91,17 @@ class Hitomi:
 
         g = int(m.group(2) + m.group(1), b)
         assert isinstance(g, int)
-        subdomain = 2 if str(g) in ggm else 1
+        subdomain = int(ggo2) if str(g) in ggm else int(ggo)
+        subdomain += 1
         return f"https://w{subdomain}.gold-usergeneratedcontent.net/{ggb}/{self.s(hash)}/{hash}.webp"
+        
 
     async def galleryblock(self, id: str) -> tuple[dict[str, Any], list[str]]:
         detail = await self.request(f"https://ltn.gold-usergeneratedcontent.net/galleries/{id}.js")
         data = json.loads(detail.content.decode().replace("var galleryinfo = ", ""))
         b, m, o, o2 = await self.gg()
         urls = [
-            self.subdomain_from_url(files["hash"], m, b, o, o2)
+            self.subdomain_from_url(files["hash"], m, b, o, o2, files["name"].split(".")[-1])
             for files in data["files"]
         ]
         return data, urls
