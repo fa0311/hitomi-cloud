@@ -1,3 +1,4 @@
+import asyncio
 import json
 import re
 import struct
@@ -44,13 +45,20 @@ class Hitomi:
         self.client = client
         self.headers = headers
 
-    async def request(self, url: str, headers: dict = {}):
-        response = await self.client.get(url, headers=headers)
+    async def request(
+        self,
+        url: str,
+        headers: dict[str, str] = {},
+        semaphore: asyncio.Semaphore = asyncio.Semaphore(10),
+    ):
+        async with semaphore:
+            response = await self.client.get(url, headers=headers)
+
         assert response.status_code >= 200 and response.status_code < 300
         return response
 
     async def get_data(self, input: str) -> list[str]:
-        url = input.replace("hitomi.la", "ltn.hitomi.la", 1).replace(
+        url = input.replace("hitomi.la", "ltn.gold-usergeneratedcontent.net", 1).replace(
             ".html", ".nozomi", 1
         )
         inf = 2**31 - 1
@@ -65,7 +73,7 @@ class Hitomi:
         return res
 
     async def gg(self) -> tuple[str, list[str], str, str]:
-        response = await self.request("https://ltn.hitomi.la/gg.js")
+        response = await self.request("https://ltn.gold-usergeneratedcontent.net/gg.js")
         b = re.search(r"b: '([0-9]+)\/'", response.content.decode()).group(1)  # type: ignore
         m = re.findall(r"case ([0-9]+):", response.content.decode())  # type: ignore
         o = re.search(r"var o = ([0-9]+);", response.content.decode()).group(1)  # type: ignore
@@ -76,28 +84,21 @@ class Hitomi:
         m = re.search(r"(..)(.)$", h)
         return str(int(m.group(2) + m.group(1), 16))  # type: ignore
 
-    def subdomain_from_url(
-        self, hash: str, ggm: list[str], ggb: str, ggo: str, ggo2: str
-    ) -> str:
-        retval = "a"
+    def subdomain_from_url(self, hash: str, ggm: list[str], ggb: str, ggo: str, ggo2: str,
+                           ) -> str:
         b = 16
 
         r = re.compile(r"[0-9a-f]{61}([0-9a-f]{2})([0-9a-f])")
         m = r.search(hash)
-        if not m:
-            return "a"
+        assert m is not None
 
         g = int(m.group(2) + m.group(1), b)
-        if not isinstance(g, int):
-            return "a"
-
-        a = int(ggo2) if str(g) in ggm else int(ggo)
-
-        retval = chr(97 + a) + retval
-        return f"https://{retval}.hitomi.la/webp/{ggb}/{self.s(hash)}/{hash}.webp"
+        assert isinstance(g, int)
+        subdomain = 2 if str(g) in ggm else 1
+        return f"https://w{subdomain}.gold-usergeneratedcontent.net/{ggb}/{self.s(hash)}/{hash}.webp"
 
     async def galleryblock(self, id: str) -> tuple[dict[str, Any], list[str]]:
-        detail = await self.request(f"https://ltn.hitomi.la/galleries/{id}.js")
+        detail = await self.request(f"https://ltn.gold-usergeneratedcontent.net/galleries/{id}.js")
         data = json.loads(detail.content.decode().replace("var galleryinfo = ", ""))
         b, m, o, o2 = await self.gg()
         urls = [
