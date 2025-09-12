@@ -55,7 +55,7 @@ async def main():
 
     manga = []
 
-    for file, ids in zip(artist_queue, ids_list):
+    for file, ids in list(zip(artist_queue, ids_list)):
         artist, lang = file.rsplit("-", 1) if "-" in file else (file, "all")
         artist_filename = downloader.sanitize_filename(urllib.parse.unquote(artist))
 
@@ -66,6 +66,7 @@ async def main():
             output = f"output/{artist_filename}/{title}_{id}"
             await os.makedirs(output, exist_ok=True)
             manga.append((output, title, data, urls))
+        await artist_queue.pop()
 
     tasks = [download_all_async(downloader, *args) for args in manga]
 

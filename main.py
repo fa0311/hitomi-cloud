@@ -12,7 +12,7 @@ async def main():
     client = httpx.AsyncClient(timeout=None)
     downloader = await HitomiDownloader.factrory(client)
     artist_queue = await HitomiArtistQueue.input_from_cache("input.txt")
-    for file in tqdm(artist_queue, leave=False):
+    for file in tqdm(list(artist_queue), leave=False):
         artist, lang = file.rsplit("-", 1) if "-" in file else (file, "all")
         url = f"https://hitomi.la/artist/{file}.html"
         artist_filename = downloader.sanitize_filename(urllib.parse.unquote(artist))
@@ -26,6 +26,7 @@ async def main():
                 bin = await downloader.save(url, data)
                 async with open(f"{output}/{i:04}.webp", "wb") as f:
                     await f.write(bin)
+        await artist_queue.pop()
 
 
 if __name__ == "__main__":

@@ -92,7 +92,7 @@ async def main():
     invisible_tag_id = await tag.get_tag_id(env.invisible_tags, hidden=True)
 
     manga = []
-    for file, ids in tqdm(zip(artist_queue, ids_list), total=len(artist_queue), leave=True):
+    for file, ids in tqdm(list(zip(artist_queue, ids_list)), leave=True):
         artist, lang = file.rsplit("-", 1) if "-" in file else (file, "all")
         artist_filename = downloader.sanitize_filename(urllib.parse.unquote(artist))
 
