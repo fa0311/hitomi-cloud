@@ -1,10 +1,11 @@
 import asyncio
+import urllib.parse
 
 import httpx
 from aiofiles import open, os
 from tqdm import tqdm
 
-from src.hitomi import HitomiDownloader
+from src.hitomi import HitomiArtistQueue, HitomiDownloader
 
 
 def print(*args, **kwargs):
@@ -47,21 +48,21 @@ async def get_galleryblock(
 async def main():
     client = httpx.AsyncClient(timeout=None)
     downloader = await HitomiDownloader.factrory(client)
-    artist = await downloader.input("input.txt")
+    artist_queue = await HitomiArtistQueue.input_from_cache("input.txt")
 
-    artist_url = [f"https://hitomi.la/artist/{file}.html" for file in artist]
+    artist_url = [f"https://hitomi.la/artist/{file}.html" for file in artist_queue]
     ids_list = await asyncio.gather(*[get_data(downloader, url) for url in artist_url])
 
     manga = []
 
-    for file, ids in zip(artist, ids_list):
+    for file, ids in zip(artist_queue, ids_list):
         artist, lang = file.rsplit("-", 1) if "-" in file else (file, "all")
-        artist_filename = downloader.sanitize_filename(artist)
+        artist_filename = downloader.sanitize_filename(urllib.parse.unquote(artist))
 
         future = [get_galleryblock(downloader, id) for id in ids]
         data_list = await asyncio.gather(*future)
         for id, data, urls in data_list:
-            title = downloader.get_title(data)
+            title = downloader.sanitize_filename(downloader.get_title(data))
             output = f"output/{artist_filename}/{title}_{id}"
             await os.makedirs(output, exist_ok=True)
             manga.append((output, title, data, urls))

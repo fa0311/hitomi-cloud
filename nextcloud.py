@@ -1,10 +1,11 @@
 import asyncio
+import urllib.parse
 
 import httpx
 from tqdm import tqdm
 
 from src.config import Settings
-from src.hitomi import HitomiDownloader
+from src.hitomi import HitomiArtistQueue, HitomiDownloader
 from src.manager import TagManager
 from src.nextcloud import NextCloud
 
@@ -20,16 +21,16 @@ async def main():
     nextcloud = NextCloud(client, env.username, env.password, env.url)
     nextcloud.cd(env.path)
     tag = await TagManager.facory(nextcloud)
-    artist = await downloader.input("input.txt")
+    artist_queue = await HitomiArtistQueue.input_from_cache("input.txt")
 
-    for file in tqdm(artist, leave=False):
+    for file in tqdm(artist_queue, leave=False):
         artist, lang = file.rsplit("-", 1) if "-" in file else (file, "all")
         url = f"https://hitomi.la/artist/{file}.html"
-        artist_filename = downloader.sanitize_filename(artist)
+        artist_filename = downloader.sanitize_filename(urllib.parse.unquote(artist))
         await nextcloud.mkdir(artist_filename)
         for id in tqdm(await downloader.get_data(url), leave=False, desc=artist):
             data, urls = await downloader.galleryblock(id)
-            title = downloader.get_title(data)
+            title = downloader.sanitize_filename(downloader.get_title(data))
             output = f"output/{artist_filename}/{title}_{id}"
             field_id = await nextcloud.mkdir(output)
             if field_id is None:

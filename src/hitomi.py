@@ -1,5 +1,6 @@
 import asyncio
 import json
+import os
 import re
 import struct
 from dataclasses import dataclass
@@ -140,21 +141,14 @@ class HitomiDownloader:
         response = await client.get(url)
         return response.json()["chrome"]
 
-    @staticmethod
-    async def input(path: str) -> list[str]:
-        async with open(path, encoding="utf-8") as f:
-            data = await f.read()
-
-        artist = re.findall(r"https://hitomi.la/artist/(.+).html", data)
-        return artist
 
     @staticmethod
     def sanitize_filename(filename: str) -> str:
-        return re.sub(r"[\\/:*?\"<>|#]", "", filename).rstrip(" .")
+        return re.sub(r"[\\/:*?\"<>|#\\.]", "", filename).strip(" ")
 
     def get_title(self, data: DataType) -> str:
         title = data.get("japanese_title") or data["title"]
-        return self.sanitize_filename(title)
+        return title
 
     def get_tags(self, data: DataType) -> list[str]:
         return [tag["tag"] for tag in (data.get("tags") or [])]
@@ -178,3 +172,50 @@ class HitomiDownloader:
     async def save(self, url: str, data: DataType):
         res = await self.hitomi.request(url, {"Referer": self.get_referer(data)})
         return res.content
+
+
+class HitomiArtistQueue:
+
+    filename = ".artist_queue"
+
+    def __init__(self, artist: list[str]):
+        self.__artist = artist
+
+    @staticmethod
+    async def input(path: str) -> list[str]:
+        async with open(path, encoding="utf-8") as f:
+            data = await f.read()
+
+        artist = re.findall(r"https://hitomi.la/artist/(.+).html", data)
+        return artist
+    
+    @classmethod
+    async def input_from_cache(cls, path: str) -> "HitomiArtistQueue":
+        if os.path.exists(HitomiArtistQueue.filename):
+            async with open(HitomiArtistQueue.filename, "r", encoding="utf-8") as f:
+                data = await f.read()
+            return cls(json.loads(data))
+        data = await HitomiArtistQueue.input(path)
+        async with open(HitomiArtistQueue.filename, "w", encoding="utf-8") as f:
+            await f.write(json.dumps(data, ensure_ascii=False, indent=4))
+        return cls(data)
+
+    async def pop(self) -> Optional[str]:
+        if not self.__artist:
+            return None
+        artist = self.__artist.pop(0)
+        async with open(HitomiArtistQueue.filename, "w", encoding="utf-8") as f:
+            data = json.dumps(self.__artist, ensure_ascii=False, indent=4)
+            await f.write(data)
+        return artist
+    
+
+    def __len__(self) -> int:
+        return len(self.__artist)
+    def __iter__(self):
+        return iter(self.__artist)
+    def __getitem__(self, index):
+        return self.__artist[index]
+    def __repr__(self):
+        return repr(self.__artist)
+    
