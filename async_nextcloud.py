@@ -85,14 +85,14 @@ async def main():
     nextcloud = NextCloud(client, env.username, env.password, env.url)
     nextcloud.cd(env.path)
     tag = await TagManager.facory(nextcloud)
-    artist_queue = await HitomiArtistQueue.input_from_cache("input.txt")
+    file_queue = await HitomiArtistQueue.input_from_cache("input.txt")
 
-    artist_url = [f"https://hitomi.la/artist/{file}.html" for file in artist_queue]
+    artist_url = [f"https://hitomi.la/artist/{file}.html" for file in file_queue]
     ids_list = await asyncio.gather(*[get_data(downloader, url) for url in artist_url])
     invisible_tag_id = await tag.get_tag_id(env.invisible_tags, hidden=True)
 
     manga = []
-    for file, ids in tqdm(list(zip(artist_queue, ids_list)), leave=True):
+    for file, ids in tqdm(list(zip(file_queue, ids_list)), leave=True):
         artist, lang = file.rsplit("-", 1) if "-" in file else (file, "all")
         artist_filename = downloader.sanitize_filename(urllib.parse.unquote(artist))
 
@@ -113,10 +113,11 @@ async def main():
             output2 = f"{artist_filename}/{TEMP_PREFIX}{int(id):09}"
             if f"{int(id):09}" not in [x.split("_")[0] for x in displaynames]:
                 print(f"Download {output}")
-                manga.append((output, output2, title, data, urls, invisible_tag_id))
-        await artist_queue.pop()
+                manga.append((file, output, output2, title, data, urls, invisible_tag_id))
 
-    tasks = [download_all_async(downloader, tag, nextcloud, *args) for args in manga]
+    await file_queue.save(list(set([args[0] for args in manga])))
+    filtered_args = [args[1:] for args in manga]
+    tasks = [download_all_async(downloader, tag, nextcloud, *args) for args in filtered_args]
 
     await asyncio.gather(*tasks)
 

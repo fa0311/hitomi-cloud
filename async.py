@@ -48,14 +48,14 @@ async def get_galleryblock(
 async def main():
     client = httpx.AsyncClient(timeout=None)
     downloader = await HitomiDownloader.factrory(client)
-    artist_queue = await HitomiArtistQueue.input_from_cache("input.txt")
+    file_queue = await HitomiArtistQueue.input_from_cache("input.txt")
 
-    artist_url = [f"https://hitomi.la/artist/{file}.html" for file in artist_queue]
+    artist_url = [f"https://hitomi.la/artist/{file}.html" for file in file_queue]
     ids_list = await asyncio.gather(*[get_data(downloader, url) for url in artist_url])
 
     manga = []
 
-    for file, ids in list(zip(artist_queue, ids_list)):
+    for file, ids in list(zip(file_queue, ids_list)):
         artist, lang = file.rsplit("-", 1) if "-" in file else (file, "all")
         artist_filename = downloader.sanitize_filename(urllib.parse.unquote(artist))
 
@@ -65,10 +65,10 @@ async def main():
             title = downloader.sanitize_filename(downloader.get_title(data))
             output = f"output/{artist_filename}/{title}_{id}"
             await os.makedirs(output, exist_ok=True)
-            manga.append((output, title, data, urls))
-        await artist_queue.pop()
-
-    tasks = [download_all_async(downloader, *args) for args in manga]
+            manga.append((file, output, title, data, urls))
+    await file_queue.save(list(set([args[0] for args in manga])))
+    filtered_args = [args[1:] for args in manga]
+    tasks = [download_all_async(downloader, *args) for args in filtered_args]
 
     await asyncio.gather(*tasks)
 

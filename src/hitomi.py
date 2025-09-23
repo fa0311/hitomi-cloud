@@ -4,7 +4,7 @@ import os
 import re
 import struct
 from dataclasses import dataclass
-from typing import Any, Optional
+from typing import Any, List, Optional
 from urllib.parse import quote
 
 import httpx
@@ -195,19 +195,26 @@ class HitomiArtistQueue:
             async with open(HitomiArtistQueue.filename, "r", encoding="utf-8") as f:
                 data = await f.read()
             return cls(json.loads(data))
-        data = await HitomiArtistQueue.input(path)
-        async with open(HitomiArtistQueue.filename, "w", encoding="utf-8") as f:
-            await f.write(json.dumps(data, ensure_ascii=False, indent=4))
-        return cls(data)
+        else:
+            data = await HitomiArtistQueue.input(path)
+            async with open(HitomiArtistQueue.filename, "w", encoding="utf-8") as f:
+                await f.write(json.dumps(data, ensure_ascii=False, indent=4))
+            return cls(data)
 
-    async def pop(self) -> Optional[str]:
-        if not self.__artist:
-            return None
-        artist = self.__artist.pop(0)
-        async with open(HitomiArtistQueue.filename, "w", encoding="utf-8") as f:
-            data = json.dumps(self.__artist, ensure_ascii=False, indent=4)
-            await f.write(data)
-        return artist
+    async def remove(self, artist: str):
+        self.__artist.remove(artist)
+        await self.save()
+    
+    async def save(self, artist: Optional[List[str]] = None):
+        if artist:
+            self.__artist = artist
+        if len(self.__artist) == 0:
+            if os.path.exists(HitomiArtistQueue.filename):
+                os.remove(HitomiArtistQueue.filename)
+        else:
+            async with open(HitomiArtistQueue.filename, "w", encoding="utf-8") as f:
+                data = json.dumps(self.__artist, ensure_ascii=False, indent=4)
+                await f.write(data)
     
 
     def __len__(self) -> int:

@@ -21,9 +21,9 @@ async def main():
     nextcloud = NextCloud(client, env.username, env.password, env.url)
     nextcloud.cd(env.path)
     tag = await TagManager.facory(nextcloud)
-    artist_queue = await HitomiArtistQueue.input_from_cache("input.txt")
+    file_queue = await HitomiArtistQueue.input("input.txt")
 
-    for file in tqdm(list(artist_queue), leave=False):
+    for file in tqdm(list(file_queue), leave=False):
         artist, lang = file.rsplit("-", 1) if "-" in file else (file, "all")
         url = f"https://hitomi.la/artist/{file}.html"
         artist_filename = downloader.sanitize_filename(urllib.parse.unquote(artist))
@@ -49,7 +49,6 @@ async def main():
                 for tag_name in tags:
                     tag_id = await tag.get_tag_id(tag_name)
                     await nextcloud.assign_tag(field_id, tag_id)
-        await artist_queue.pop()
 
 
 if __name__ == "__main__":
